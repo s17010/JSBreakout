@@ -6,7 +6,7 @@ window.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('board');
     new Breakout({
             canvas: canvas,
-            interval: 1000 / 60,
+            interval: 1000 / 60,    // 60 FPS
             paddle: {
                 width: 100,
                 height: 10,
@@ -15,6 +15,10 @@ window.addEventListener('DOMContentLoaded', () => {
             ball: {
                 radius: 5,
                 color: '#ffffff'
+            },
+            block: {
+                width: 80,
+                height: 20
             }
         });
 });
@@ -52,7 +56,6 @@ class Breakout {
         // 受け取ったパラメータをプロパティに保存
         this.canvas = options.canvas;
         this.context = this.canvas.getContext('2d');
-
         // ゲーム画面のサイズを取得
         Breakout.width = this.canvas.width;
         Breakout.height = this.canvas.height;
@@ -67,16 +70,24 @@ class Breakout {
             options.paddle.height,
             options.paddle.color);
 
-        this.paddle.setPosition(Breakout.width / 2, Breakout.height * 8 / 9);
+        this.paddle.setPosition(Breakout.width / 2,
+            Breakout.height * 8 / 9);
         this.paddle.setSpeed(Breakout.width / 100);
+
+        // ブロックマネージャの初期化
+        this.blockManager = new BlockManager(
+            options.block.width, options.block.height);
+        this.blockManager.stage1();
 
         // ボールの初期化
         this.ball = new Ball(
             options.ball.radius, options.ball.color);
         this.ball.setPosition(Breakout.width / 2, Breakout.height / 2);
 
-        //ボールに当たり判定してもらうお願い
+        // ボールに当たり判定してもらうおねがい
         this.ball.addTarget(this.paddle);
+        this.ball.addTarget(this.blockManager.blockList);
+
 
         // 描画のためのタイマーセット
         setInterval(this.draw.bind(this), options.interval);
@@ -88,12 +99,11 @@ class Breakout {
     keydown(evt) {
         if (evt.keyCode === 37 /*左キー*/) {
             this.leftKey = true;
-        }
-        else if (evt.keyCode === 39 /*右キー*/) {
+        } else if (evt.keyCode === 39 /*右キー*/) {
             this.rightKey = true;
         } else if (evt.code === 'Space') {
-            //debug
-            this.ball.setSpeed(5,135);
+            // debug
+            this.ball.setSpeed(5, 135);
         }
     }
 
@@ -104,7 +114,6 @@ class Breakout {
             this.rightKey = false;
         }
     }
-
 
     draw() {
         this.context.clearRect(0, 0, Breakout.width, Breakout.height);
@@ -121,13 +130,13 @@ class Breakout {
             this.context.font = "48pt Arial";
             this.context.textAlign = "center";
             this.context.fillText("GameOver", Breakout.width / 2, Breakout.height / 2);
-            this.context.strokeText("GameOver", Breakout.width / 2, Breakout.height / 2);
 
             this.context.restore();
         } else {
             this.ball.draw(this.context);
         }
         this.paddle.draw(this.context);
+        this.blockManager.draw(this.context);
     }
 }
 
@@ -148,14 +157,12 @@ class Entity {
         ]
     }
 
-    hit() {
+    hit(ball) {
     }
-
 }
 
-
-class Paddle extends Entity{
-    constructor(width, height, color){
+class Paddle extends Entity {
+    constructor(width, height, color) {
         super();
         this.width = width;
         this.height = height;
@@ -167,14 +174,16 @@ class Paddle extends Entity{
 
     /**
      * 描画処理するメソッド
+     *
      * @param context CanvasRenderingContext2D
      */
-    draw(context){
+    draw(context) {
         context.save();
 
-        context.translate(this.x,this.y);
+        context.translate(this.x, this.y);
         context.fillStyle = this.color;
-        context.fillRect(-(this.width / 2), -(this.height / 2), this.width, this.height);
+        context.fillRect(-(this.width / 2), -(this.height / 2),
+            this.width, this.height);
 
         context.restore();
     }
@@ -199,7 +208,7 @@ class Paddle extends Entity{
     }
 
     /**
-     * 左へ移動する
+     * ひだりへ移動する
      */
     moveLeft() {
         this.x -= this.speed;
@@ -207,7 +216,7 @@ class Paddle extends Entity{
     }
 
     /**
-     * 右へ移動する
+     * みぎへ移動する
      */
     moveRight() {
         this.x += this.speed;
@@ -215,7 +224,7 @@ class Paddle extends Entity{
     }
 
     /**
-     * はみ出さないように位置を調整する
+     * はみ出ないように位置を調整する
      */
     fixPosition() {
         const left = this.x - (this.width / 2);
@@ -230,23 +239,107 @@ class Paddle extends Entity{
     }
 
     /**
-     * 当たった後の何か
+     * 当たったあとのなにか
      */
-
     hit(ball) {
-        //ボールがPaddleの右4分の1にあるか
+        // ボールがPaddleの右4分の1にあるか
         if (this.x + this.width / 4 < ball.x) {
             ball.changeAngle();
             return;
         }
-        //ボールがpaddleの左4分の1にあるか
+        // ボールがPaddleの左4分の1にあるか
         if (this.x - this.width / 4 > ball.x) {
             ball.changeAngle(true);
         }
     }
+}
+
+class Block extends Entity {
+    static get colorSet() {
+        return [
+            ['#ffb6c1','#ff00ff'],
+            ['#87ceeb','#0000ff'],
+            ['#90ee90','#68be8e'],
+            ['#4b0082','#8a2be2'],
+            ['#fa8072','#b22222'],
+            ['#00ffff','#000080'],
+            ['#f5b1aa','#f09199'],
+            ['#e83929','#a22041'],
+            ['#4c6cb3','#1e50a2'],
+            ['#f5e56b','#ffd900'],
+        ];
+    }
+    constructor(manager, x, y, width, height, color){
+        super();
+        this.manager = manager;
+        this.width = width;
+        this.height = height;
+        if (color >= Block.colorSet.length) {
+            color = Block.colorSet.length - 1;
+        }
+        this.color = Block.colorSet[color];
+        this.x = x;
+        this.y = y;
+    }
+
+    /**
+     * 描画処理するメソッド
+     *
+     * @param context CanvasRenderingContext2D
+     */
+    draw(context) {
+        context.save();
+
+        context.translate(this.x,this.y);
+        context.fillStyle = this.color[0];
+        context.fillRect(-(this.width / 2), -(this.height / 2),
+            this.width, this.height);
+        context.lineWidth = 4;
+        context.strokeStyle = this.color[1];
+        context.strokeRect(-(this.width / 2) + 2, -(this.height / 2) + 2,
+            this.width - 4, this.height - 4);
+
+        context.restore();
+    }
+
+    /**
+     * ボールと当たったので消えます
+     */
+    hit(ball) {
+        ball.removeTarget(this);
+        this.manager.removeTarget(this);
+    }
+}
+
+class BlockManager {
+    constructor(baseWidth, baseHeight) {
+        this.baseWidth = baseWidth;
+        this.baseHeight = baseHeight;
+        this.blockList = [];
+    }
+
+    stage1() {
+        for (let x = 0; x < 7; x++) {
+            for (let y = 0; y < 6; y++) {
+                const color = parseInt(Math.random() * Block.colorSet.length);
+                this.blockList.push(
+                    new Block(this, this.baseWidth * (x + 1)
+                        , this.baseHeight * (y + 1),
+                        this.baseWidth, this.baseHeight, color));
+            }
+        }
+    }
+
+    removeTarget(object) {
+        this.blockList.splice(this.blockList.indexOf(object), 1);
+    }
 
 
-
+    draw(context) {
+        this.blockList.forEach((block) => {
+            block.draw(context);
+        }, this);
+    }
 }
 
 class Ball {
@@ -265,10 +358,16 @@ class Ball {
      */
     addTarget(object) {
         if (Array.isArray(object)) {
-            this.targetList.concat(object);
+            for (let i in object) {
+                this.targetList.push(object[i]);
+            }
         } else {
             this.targetList.push(object);
         }
+    }
+
+    removeTarget(object) {
+        this.targetList.splice(this.targetList.indexOf(object), 1);
     }
 
     /**
@@ -282,11 +381,10 @@ class Ball {
     }
 
     /**
-     * 移動速度と向きを設定する
+     * 移動速度と向きを指定する
      * @param speed
      * @param direction
      */
-
     setSpeed(speed, direction) {
         const rad = direction * Math.PI / 180;
         this.dx = Math.cos(rad) * speed;
@@ -311,31 +409,34 @@ class Ball {
     collision() {
         let isCollision = false;
         this.targetList.forEach((target) => {
-            //角チェック
+            if (isCollision) {
+                return false;
+            }
+            // 角チェック
             const points = target.getCornerPoints();
             points.forEach((point) => {
                 const a = Math.sqrt(
-                    Math.pow(this.x - point.x, 2) + Math.pow(this.y - point.y,2));
+                    Math.pow(this.x - point.x, 2) + Math.pow(this.y - point.y, 2));
                 if (a <= this.radius) {
                     isCollision = true;
                     target.hit(this);
                 }
             }, this);
 
-            //各側面のチェック
+            if (isCollision) {
+                return false;
+            }
+            // 各側面のチェック
             const bl = this.x - this.radius;
             const br = this.x + this.radius;
             const bt = this.y - this.radius;
             const bb = this.y + this.radius;
             if (points[0].x < br && bl < points[1].x) {
                 if (points[0].y < bb && bt < points[2].y) {
-                    //console.log(bl,br,bt,bb,points[0].x,points[0].y,points[2].y
                     isCollision = true;
-                    this.y -= bb - points[0].y;
                     target.hit(this);
                 }
             }
-
         }, this);
 
         return isCollision;
@@ -350,10 +451,11 @@ class Ball {
         if (ccw) {
             theta -= Math.PI * 5 / 180;
         } else {
-            theta += Math.PI * 5 /180;
+            theta += Math.PI * 5 / 180;
         }
+
         if (theta <= -0.7853981634 || theta >= 0.5235987756) {
-            //変更なしにする
+            // 変更なしにする
             return;
         }
         this.dx = Math.cos(theta) * speed;
@@ -361,11 +463,10 @@ class Ball {
     }
 
     /**
-     * はみ出さないように位置を調整する
+     * はみ出ないように位置を調整する
      */
-    fixPosition(){
-        // 画面左側を超えているか判定と座標修正
-
+    fixPosition() {
+        // 画面左側を超えてるか判定と座標修正
         const left = this.x - this.radius;
         if (left < 0) {
             this.x += Math.abs(left);
@@ -386,7 +487,7 @@ class Ball {
             this.reflectionX();
         }
 
-        // 画面の下側を超えているか判定と一時的に座標修正
+        // 画面下側を超えているか判定と一時的に座標修正
         if (top > Breakout.height) {
             Breakout.setGameOver();
         }
@@ -406,13 +507,11 @@ class Ball {
         this.dy *= -1;
     }
 
-
     /**
      * 描画処理するメソッド
      *
      * @param context CanvasRenderingContext2D
      */
-
     draw(context) {
         // 移動関連
         this.move();
@@ -430,5 +529,4 @@ class Ball {
 
         context.restore();
     }
-
 }
