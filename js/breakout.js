@@ -141,34 +141,43 @@ class Breakout {
 }
 
 class Entity {
-    constructor() {
-        this.x = 0;
-        this.y = 0;
-        this.width = 0;
-        this.height = 0;
+    get left() {
+        return this.x - this.width / 2;
     }
 
-    getCornerPoints() {
-        return [
-            {x: this.x - this.width / 2, y: this.y - this.height / 2},
-            {x: this.x + this.width / 2, y: this.y - this.height / 2},
-            {x: this.x + this.width / 2, y: this.y + this.height / 2},
-            {x: this.x - this.width / 2, y: this.y + this.height / 2}
-        ]
+    get top() {
+        return this.y - this.height / 2;
+    }
+
+    get right() {
+        return this.x + this.width / 2;
+    }
+
+    get bottom() {
+        return this.y + this.height / 2;
+    }
+
+    constructor(x, y, width, height) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+    }
+}
+
+class Collideable extends Entity {
+    constructor(x, y, width, height) {
+        super(x, y, width, height);
     }
 
     hit(ball) {
     }
 }
 
-class Paddle extends Entity {
+class Paddle extends Collideable {
     constructor(width, height, color) {
-        super();
-        this.width = width;
-        this.height = height;
+        super(0, 0, width, height);
         this.color = color;
-        this.x = 0;
-        this.y = 0;
         this.speed = 0;
     }
 
@@ -254,7 +263,7 @@ class Paddle extends Entity {
     }
 }
 
-class Block extends Entity {
+class Block extends Collideable {
     static get colorSet() {
         return [
             ['#ffb6c1','#ff00ff'],
@@ -267,20 +276,22 @@ class Block extends Entity {
             ['#e83929','#a22041'],
             ['#4c6cb3','#1e50a2'],
             ['#f5e56b','#ffd900'],
+            ['#ffc6c6' , '#7fffff'],
+            ['#e44d93','#00a0de'],
+            ['#522886','#e44d93'],
+            ['#d7c447','#9caeb7'],
+            ['#99ff99','#66ffff'],
+            ['#993300','#0000cc'],
         ];
     }
 
     constructor(manager, x, y, width, height, color) {
-        super();
+        super(x, y, width, height);
         this.manager = manager;
-        this.width = width;
-        this.height = height;
         if (color >= Block.colorSet.length) {
             color = Block.colorSet.length - 1;
         }
         this.color = Block.colorSet[color];
-        this.x = x;
-        this.y = y;
     }
 
     /**
@@ -343,12 +354,11 @@ class BlockManager {
     }
 }
 
-class Ball {
+class Ball extends Entity {
     constructor(radius, color) {
+        super(0, 0, radius * 2, radius * 2);
         this.radius = radius;
         this.color = color;
-        this.x = 0;
-        this.y = 0;
         this.dx = 0;
         this.dy = 0;
         this.targetList = [];
@@ -418,40 +428,20 @@ class Ball {
                 return false;
             }
 
-            const points = target.getCornerPoints();
-            // 角チェック
-            /*
-            points.forEach((point) => {
-                const a = Math.sqrt(
-                    Math.pow(this.x - point.x, 2) + Math.pow(this.y - point.y, 2));
-                if (a <= this.radius) {
-                    collideSide = 3;
-                    target.hit(this);
-                }
-            }, this);
-            if (collideSide !== 0) {
-                return false;
-            }
-            */
-
             // 各側面のチェック
-            const bl = this.x - this.radius;
-            const br = this.x + this.radius;
-            const bt = this.y - this.radius;
-            const bb = this.y + this.radius;
-            if (points[0].x < br && bl < points[1].x) {
-                if (points[0].y < bb && bt < points[2].y) {
+            if (target.left < this.right && this.left < target.right) {
+                if (target.top < this.bottom && this.top < target.bottom) {
                     target.hit(this);
-                    const dl = Math.abs(points[0].x - br);
-                    const dt = Math.abs(points[0].y - bb);
-                    const dr = Math.abs(points[1].x - bl);
-                    const db = Math.abs(points[2].y - bt);
-                    const min = Math.min(dl, dt, dr, db);
+                    const distanceLeft = Math.abs(target.left - this.right);
+                    const distanceTop = Math.abs(target.top - this.bottom);
+                    const distanceRight = Math.abs(target.right - this.left);
+                    const distanceBottom = Math.abs(target.bottom - this.top);
+                    const min = Math.min(distanceLeft, distanceTop, distanceRight, distanceBottom);
 
-                    if (min === dl || min === dr) {
+                    if (min === distanceLeft || min === distanceRight) {
                         collideSide += 1;
                     }
-                    if (min === dt || min === db) {
+                    if (min === distanceTop || min === distanceBottom) {
                         collideSide += 2;
                     }
                 }
