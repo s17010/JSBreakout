@@ -3,8 +3,11 @@
  */
 window.addEventListener('DOMContentLoaded', () => {
     // 初期化
+    const point = document.getElementById("score");
+    score.innerHTML = point;
     const canvas = document.getElementById('board');
     new Breakout({
+            point: point,
             canvas: canvas,
             interval: 1000 / 60,    // 60 FPS
             paddle: {
@@ -94,6 +97,7 @@ class Breakout {
 
         window.addEventListener('keydown', this.keydown.bind(this));
         window.addEventListener('keyup', this.keyup.bind(this));
+
     }
 
     keydown(evt) {
@@ -130,6 +134,7 @@ class Breakout {
             this.context.font = "48pt Arial";
             this.context.textAlign = "center";
             this.context.fillText("GameOver", Breakout.width / 2, Breakout.height / 2);
+
 
             this.context.restore();
         } else {
@@ -171,6 +176,7 @@ class Collideable extends Entity {
     }
 
     hit(ball) {
+        point += 1;
     }
 }
 
@@ -313,7 +319,6 @@ class Block extends Collideable {
 
         context.restore();
     }
-
     /**
      * ボールと当たったので消えます
      */
