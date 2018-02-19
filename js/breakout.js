@@ -1,13 +1,13 @@
 /**
  * Created by s17010 on 17/10/30.
  */
+/**
+ * Created by s17010 on 17/10/30.
+ */
 window.addEventListener('DOMContentLoaded', () => {
     // 初期化
-    const point = document.getElementById("score");
-    score.innerHTML = point;
     const canvas = document.getElementById('board');
     new Breakout({
-            point: point,
             canvas: canvas,
             interval: 1000 / 60,    // 60 FPS
             paddle: {
@@ -23,8 +23,10 @@ window.addEventListener('DOMContentLoaded', () => {
                 width: 80,
                 height: 20
             }
-        });
+        });score = 0;
 });
+
+let point = 0;
 
 class Breakout {
     static set width(w) {
@@ -133,7 +135,7 @@ class Breakout {
             this.context.fillStyle = '#ff0000'; //red
             this.context.font = "48pt Arial";
             this.context.textAlign = "center";
-            this.context.fillText("GameOver", Breakout.width / 2, Breakout.height / 2);
+            this.context.fillText("GameOver score:"+point, Breakout.width / 2, Breakout.height / 2);
 
 
             this.context.restore();
@@ -176,7 +178,6 @@ class Collideable extends Entity {
     }
 
     hit(ball) {
-        point += 1;
     }
 }
 
@@ -325,6 +326,8 @@ class Block extends Collideable {
     hit(ball) {
         ball.removeTarget(this);
         this.manager.removeTarget(this);
+        document.getElementById('score').innerHTML = score += 1;
+        point++;
     }
 }
 
